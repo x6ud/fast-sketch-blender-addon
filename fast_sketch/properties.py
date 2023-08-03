@@ -32,6 +32,9 @@ class FastSketchGroupProperties(bpy.types.PropertyGroup):
                                     name="Segments",
                                     update=property_update_callback)
     mirror_axis: bpy.props.BoolVectorProperty(name="Mirror", update=property_update_callback)
+    mirror_merge: bpy.props.BoolProperty(name="Mirror Merge", update=property_update_callback)
+    mirror_merge_threshold: bpy.props.FloatProperty(name="Mirror Merge THRESHOLD", default=0.001, unit="LENGTH",
+                                                    update=property_update_callback)
     bisect_axis: bpy.props.BoolVectorProperty(name="Bisect", update=property_update_callback)
     remesh: bpy.props.BoolProperty(default=False, name="Remesh")
     remesh_voxel_size: bpy.props.FloatProperty(default=0.05, min=0.0001, max=100, name="Voxel Size", unit="LENGTH")

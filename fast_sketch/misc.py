@@ -1,3 +1,5 @@
+import re
+
 import bpy
 import mathutils
 from bpy_extras.view3d_utils import region_2d_to_location_3d
@@ -61,3 +63,22 @@ def update_branch(target_tube_index, target_node_index):
                 update(sub_tube_index, 0)
 
     update(target_tube_index, target_node_index)
+
+
+def replace_join_nodes_with_boolean_nodes():
+    obj = bpy.context.object
+    geo_nodes = obj.modifiers.get("Fast Sketch Mesh")
+    tree = geo_nodes.node_group
+    for join_node in tree.nodes:
+        if re.match(r'Tube_([0-9]+)', join_node.name) or join_node.name == "Join" or join_node.name == "Join2":
+            bool_node = tree.nodes.new(type="GeometryNodeMeshBoolean")
+            bool_node.location.x = join_node.location.x
+            bool_node.location.y = join_node.location.y
+            bool_node.select = False
+            bool_node.operation = "UNION"
+            bool_node.inputs[2].default_value = True
+            for link in join_node.inputs[0].links:
+                tree.links.new(link.from_socket, bool_node.inputs["Mesh 2"])
+            for link in join_node.outputs[0].links:
+                tree.links.new(bool_node.outputs["Mesh"], link.to_socket)
+            tree.nodes.remove(join_node)

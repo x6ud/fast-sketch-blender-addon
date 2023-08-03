@@ -1,5 +1,6 @@
 import bpy
 
+from .misc import replace_join_nodes_with_boolean_nodes
 from .update import update_geometry
 
 
@@ -36,6 +37,10 @@ class FastSketchPanel(bpy.types.Panel):
         row.prop(fast_sketch, "mirror_axis", index=1, toggle=True, text="Y")
         row.prop(fast_sketch, "mirror_axis", index=2, toggle=True, text="Z")
         row = layout.row(align=True)
+        row.label(text="Merge")
+        row.prop(fast_sketch, "mirror_merge", text="")
+        row.prop(fast_sketch, "mirror_merge_threshold", text="")
+        row = layout.row(align=True)
         row.label(text="Bisect")
         row.prop(fast_sketch, "bisect_axis", index=0, toggle=True, text="X")
         row.prop(fast_sketch, "bisect_axis", index=1, toggle=True, text="Y")
@@ -55,7 +60,8 @@ class FastSketchPanel(bpy.types.Panel):
         layout.prop(fast_sketch, "smooth")
         layout.prop(fast_sketch, "smooth_iterators")
         layout.prop(fast_sketch, "smooth_factor")
-        layout.operator("fast_sketch.bake", text="Bake!")
+        layout.operator("fast_sketch.create_armature", text="Create Armature", icon="OUTLINER_OB_ARMATURE")
+        layout.operator("fast_sketch.bake", text="Bake!", icon="CHECKMARK")
 
 
 class FastSketchBakeOperator(bpy.types.Operator):
@@ -69,6 +75,8 @@ class FastSketchBakeOperator(bpy.types.Operator):
         # apply geometry nodes
         geo_nodes = context.object.modifiers.get("Fast Sketch Mesh")
         if geo_nodes:
+            if not context.object.fast_sketch_properties.remesh:
+                replace_join_nodes_with_boolean_nodes()
             bpy.ops.object.modifier_apply(modifier="Fast Sketch Mesh")
 
         # apply mirror
@@ -152,5 +160,45 @@ class FastSketchRemoveTubeOperator(bpy.types.Operator):
 
             # update gizmo
             bpy.context.region.tag_redraw()
+
+        return {'FINISHED'}
+
+
+class FastSketchCreateArmatureOperator(bpy.types.Operator):
+    bl_idname = "fast_sketch.create_armature"
+    bl_label = "Fast Sketch Create Armature"
+
+    def execute(self, context):
+        bpy.ops.ed.undo_push()
+
+        armature = bpy.data.armatures.new('Armature')
+        obj = bpy.data.objects.new('Armature', armature)
+        context.scene.collection.objects.link(obj)
+        obj.matrix_world = context.object.matrix_world
+
+        tubes = context.object.fast_sketch_properties.tubes
+
+        bpy.context.view_layer.objects.active = obj
+        bpy.ops.object.mode_set(mode='EDIT')
+
+        tube_bones = []
+        for tube in tubes:
+            bones = []
+            tube_bones.append(bones)
+            prev_bone = None
+            if 0 <= tube.parent_tube_index < len(tube_bones):
+                prev_bone = tube_bones[tube.parent_tube_index][tube.parent_node_index]
+            for i in range(1, len(tube.nodes)):
+                start = tube.nodes[i - 1].location
+                end = tube.nodes[i].location
+                bone = armature.edit_bones.new("Bone")
+                bone.head = start
+                bone.tail = end
+                if prev_bone:
+                    bone.parent = prev_bone
+                prev_bone = bone
+                bones.append(bone)
+
+        bpy.context.view_layer.update()
 
         return {'FINISHED'}

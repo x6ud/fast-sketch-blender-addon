@@ -157,6 +157,8 @@ def update_mirror():
     mirror.use_axis[0] = obj.fast_sketch_properties.mirror_axis[0]
     mirror.use_axis[1] = obj.fast_sketch_properties.mirror_axis[1]
     mirror.use_axis[2] = obj.fast_sketch_properties.mirror_axis[2]
+    mirror.use_mirror_merge = obj.fast_sketch_properties.mirror_merge
+    mirror.merge_threshold = obj.fast_sketch_properties.mirror_merge_threshold
     mirror.use_bisect_axis[0] = obj.fast_sketch_properties.bisect_axis[0]
     mirror.use_bisect_axis[1] = obj.fast_sketch_properties.bisect_axis[1]
     mirror.use_bisect_axis[2] = obj.fast_sketch_properties.bisect_axis[2]

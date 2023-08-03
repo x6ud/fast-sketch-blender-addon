@@ -9,14 +9,15 @@ bl_info = {
 
 import bpy
 
+from .gizmo import FastSketchGizmo, FastSketchGizmoGroup
 from .properties import FastSketchNodeProperties, FastSketchTubeProperties, FastSketchGroupProperties, \
     FastSketchWmProperties
+from .tool import FastSketchToolOperator, FastSketchTool
 from .ui import FastSketchTubeList, FastSketchPanel, \
     FastSketchBakeOperator, \
     FastSketchAddTubeOperator, \
-    FastSketchRemoveTubeOperator
-from .tool import FastSketchToolOperator, FastSketchTool
-from .gizmo import FastSketchGizmo, FastSketchGizmoGroup
+    FastSketchRemoveTubeOperator, \
+    FastSketchCreateArmatureOperator
 
 classes = [
     FastSketchNodeProperties,
@@ -29,6 +30,7 @@ classes = [
     FastSketchBakeOperator,
     FastSketchAddTubeOperator,
     FastSketchRemoveTubeOperator,
+    FastSketchCreateArmatureOperator,
 
     FastSketchToolOperator,
 
