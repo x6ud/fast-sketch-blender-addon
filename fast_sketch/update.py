@@ -104,8 +104,10 @@ def update_geometry():
                 transform_node.label = "Transform / Node %d" % node_index
                 transform_node.select = False
                 tree.links.new(sphere_node.outputs["Mesh"], transform_node.inputs["Geometry"])
-                if len(tube.nodes) == 1:
-                    tree.links.new(transform_node.outputs["Geometry"], tube_node.inputs["Geometry"])
+            if len(tube.nodes) == 1:
+                tree.links.new(transform_node.outputs["Geometry"], tube_node.inputs["Geometry"])
+            else:
+                remove_link(tree, transform_node_name, "Geometry", tube_node_name, "Geometry")
             transform_node.inputs["Translation"].default_value = node.location
             transform_node.inputs["Scale"].default_value = (node.radius, node.radius, node.radius)
             transform_node.location.x = -200

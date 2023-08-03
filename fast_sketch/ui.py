@@ -134,11 +134,20 @@ class FastSketchRemoveTubeOperator(bpy.types.Operator):
 
     def execute(self, context):
         tubes = context.object.fast_sketch_properties.tubes
-        index = context.object.fast_sketch_properties.active_index
-        if index >= 0:
+        tube_index = context.object.fast_sketch_properties.active_index
+        if tube_index >= 0:
             bpy.ops.ed.undo_push()
-            tubes.remove(index)
-            context.object.fast_sketch_properties.active_index = min(index, len(tubes) - 1)
+            tubes.remove(tube_index)
+            context.object.fast_sketch_properties.active_index = min(tube_index, len(tubes) - 1)
+
+            # remove branch relationships
+            for sub_tube in tubes:
+                if sub_tube.parent_tube_index == tube_index:
+                    sub_tube.parent_tube_index = -1
+                    sub_tube.parent_node_index = -1
+                elif sub_tube.parent_tube_index > tube_index:
+                    sub_tube.parent_tube_index -= 1
+
             update_geometry()
 
             # update gizmo

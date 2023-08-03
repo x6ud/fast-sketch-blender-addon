@@ -12,11 +12,14 @@ class FastSketchNodeProperties(bpy.types.PropertyGroup):
     location: bpy.props.FloatVectorProperty(name="Location", subtype="XYZ", unit="LENGTH")
     radius: bpy.props.FloatProperty(name="Radius", unit="LENGTH", min=0)
     active: bpy.props.BoolProperty(name="Active")
+    visited: bpy.props.BoolProperty()
 
 
 class FastSketchTubeProperties(bpy.types.PropertyGroup):
     name: bpy.props.StringProperty(name="Name")
     nodes: bpy.props.CollectionProperty(type=FastSketchNodeProperties, name="Nodes")
+    parent_tube_index: bpy.props.IntProperty(default=-1)
+    parent_node_index: bpy.props.IntProperty(default=-1)
 
 
 class FastSketchGroupProperties(bpy.types.PropertyGroup):
@@ -43,3 +46,4 @@ class FastSketchWmProperties(bpy.types.PropertyGroup):
     insert_loc: bpy.props.FloatVectorProperty()
     insert_index: bpy.props.IntProperty(default=-1)
     insert_radius: bpy.props.FloatProperty(default=.5)
+    is_branch: bpy.props.BoolProperty()

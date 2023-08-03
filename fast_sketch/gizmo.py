@@ -1,7 +1,8 @@
-import bpy
-import bgl
-import mathutils
 import math
+
+import bpy
+import mathutils
+
 from .misc import get_mouse_pointing_node_index
 
 
@@ -39,6 +40,9 @@ class FastSketchGizmo(bpy.types.Gizmo):
     def _begin_line(self):
         self._prev_line_point = None
 
+    def _move_to(self, loc):
+        self._prev_line_point = loc
+
     def _line_to(self, loc):
         if self._prev_line_point:
             v = loc - self._prev_line_point
@@ -63,7 +67,7 @@ class FastSketchGizmo(bpy.types.Gizmo):
 
     def test_select(self, context, location):
         old_index = self._select_index
-        _, self._select_index = get_mouse_pointing_node_index(context, location)
+        _, _, self._select_index = get_mouse_pointing_node_index(context, location)
 
         # force redraw
         if old_index != self._select_index:
@@ -77,6 +81,7 @@ class FastSketchGizmo(bpy.types.Gizmo):
         insert_index = context.window_manager.fast_sketch.insert_index
         insert_loc = mathutils.Vector(context.window_manager.fast_sketch.insert_loc)
         insert_radius = context.window_manager.fast_sketch.insert_radius
+        is_branch = context.window_manager.fast_sketch.is_branch
 
         if is_inserting and insert_index == -1:
             self.alpha = 1
@@ -98,6 +103,8 @@ class FastSketchGizmo(bpy.types.Gizmo):
                     # draw circle
                     self.alpha = 1
                     self.color = (1, 1, 1)
+                    if index == 0:
+                        self.color = (.75, .75, 1)
                     if index == self._select_index and not is_inserting:
                         self.color = (1, 0, 1)
                     if node.active:
@@ -118,6 +125,9 @@ class FastSketchGizmo(bpy.types.Gizmo):
                         self.alpha = 0.5
                         self.color = (1, 1, 1)
                         self._line_to(insert_loc)
+
+                        if is_branch:
+                            self._move_to(loc)
 
 
 class FastSketchGizmoGroup(bpy.types.GizmoGroup):

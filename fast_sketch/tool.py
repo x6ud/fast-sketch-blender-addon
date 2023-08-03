@@ -1,11 +1,13 @@
-import bpy
-from bpy_extras.view3d_utils import region_2d_to_location_3d, location_3d_to_region_2d
-import gpu
-from gpu_extras.batch import batch_for_shader
-import mathutils
 import time
 from pathlib import Path
-from .misc import get_mouse_pointing_node_index
+
+import bpy
+import gpu
+import mathutils
+from bpy_extras.view3d_utils import region_2d_to_location_3d, location_3d_to_region_2d
+from gpu_extras.batch import batch_for_shader
+
+from .misc import get_mouse_pointing_node_index, update_branch
 from .update import update_geometry, update_mirror
 
 RADIUS_STEP = 0.02
@@ -54,10 +56,10 @@ class FastSketchToolOperator(bpy.types.Operator):
                     group = active_obj.fast_sketch_properties
                     if group.active_index >= 0 and group.active_index < len(group.tubes):
                         active_tube = group.tubes[group.active_index]
-                        for index, node in enumerate(active_tube.nodes):
+                        for node_index, node in enumerate(active_tube.nodes):
                             if node.active:
                                 active_node = node
-                                insert_index = index
+                                insert_index = node_index
                                 break
 
                 if insert_index < 0 and active_tube:
@@ -73,6 +75,26 @@ class FastSketchToolOperator(bpy.types.Operator):
                 mouse_location = region_2d_to_location_3d(region, r3d, (x, y), depth_loc)
 
                 # create
+
+                if context.window_manager.fast_sketch.is_branch and active_obj and active_tube \
+                        and 0 <= insert_index < len(active_tube.nodes) - 1:
+                    parent_node = active_tube.nodes[insert_index]
+                    location = mathutils.Vector(parent_node.location)
+                    radius = parent_node.radius
+                    tubes = active_obj.fast_sketch_properties.tubes
+                    sub_tube = tubes.add()
+                    sub_tube.name = "Tube"
+                    sub_tube.parent_tube_index = active_obj.fast_sketch_properties.active_index
+                    sub_tube.parent_node_index = insert_index
+                    if active_tube.parent_tube_index >= 0:
+                        sub_tube.parent_tube_index = active_tube.parent_tube_index
+                        sub_tube.parent_node_index = active_tube.parent_node_index
+                    active_obj.fast_sketch_properties.active_index = len(tubes) - 1
+                    active_tube = sub_tube
+                    insert_index = 0
+                    new_node = active_tube.nodes.add()
+                    new_node.location = location
+                    new_node.radius = radius
 
                 if not active_obj:
                     mesh = bpy.data.meshes.new("Sketch")
@@ -116,7 +138,7 @@ class FastSketchToolOperator(bpy.types.Operator):
 
                 # get mouse clicked node index
                 mouse_location = (event.mouse_region_x, event.mouse_region_y)
-                tube, pointing_index = get_mouse_pointing_node_index(context, mouse_location)
+                tube, tube_index, pointing_index = get_mouse_pointing_node_index(context, mouse_location)
 
                 # do select when mouse is clicked and released and not moved
                 self._clicked_index = pointing_index
@@ -134,10 +156,10 @@ class FastSketchToolOperator(bpy.types.Operator):
                 self._drag_move = pointing_index >= 0
                 self._drag_start_state = []
                 if context.object is not None and context.object.fast_sketch_properties.is_fast_sketch:
-                    active_index = context.object.fast_sketch_properties.active_index
+                    tube_index = context.object.fast_sketch_properties.active_index
                     tubes = context.object.fast_sketch_properties.tubes
-                    if active_index >= 0:
-                        tube = tubes[active_index]
+                    if tube_index >= 0:
+                        tube = tubes[tube_index]
                         for node in tube.nodes:
                             self._drag_start_state.append({
                                 "location": mathutils.Vector(node.location),
@@ -177,12 +199,12 @@ class FastSketchToolOperator(bpy.types.Operator):
                 # ============================ change selected node radius ============================
 
                 # get mouse hovered node index
-                tube, active_index = get_mouse_pointing_node_index(
+                tube, tube_index, pointing_index = get_mouse_pointing_node_index(
                     context, (event.mouse_region_x, event.mouse_region_y)
                 )
                 # resize all selected nodes
-                if tube and active_index >= 0:
-                    node = tube.nodes[active_index]
+                if tube and pointing_index >= 0:
+                    node = tube.nodes[pointing_index]
                     if node.active:
                         # limit undo records num
                         now = time.time()
@@ -190,7 +212,7 @@ class FastSketchToolOperator(bpy.types.Operator):
                             bpy.ops.ed.undo_push()
                         FastSketchToolOperator._wheel_input_last_timestamp = now
 
-                        for node in tube.nodes:
+                        for node_index, node in enumerate(tube.nodes):
                             if node.active:
                                 r = node.radius
                                 if event.type == "WHEELUPMOUSE":
@@ -198,6 +220,7 @@ class FastSketchToolOperator(bpy.types.Operator):
                                 else:
                                     r = max(r - RADIUS_STEP, RADIUS_MIN)
                                 node.radius = r
+                                update_branch(tube_index, node_index)
 
                         update_geometry()
 
@@ -211,51 +234,64 @@ class FastSketchToolOperator(bpy.types.Operator):
             if event.alt:
                 # ============================ alt + mouse move ============================
                 context.window_manager.fast_sketch.is_inserting = True
+                context.window_manager.fast_sketch.is_branch = event.shift
                 # update mouse location for gizmo
                 self._update_insert_pos(context, event)
             return {"FINISHED"}
 
-        if event.type == "LEFT_ALT" or event.type == "RIGHT_ALT":
-            # ============================ alt ============================
+        if event.type == "LEFT_ALT" or event.type == "RIGHT_ALT" or event.type == "LEFT_SHIFT" or event.type == "RIGHT_SHIFT":
+            # ============================ alt / shift ============================
             # ============================ prepare inserting ============================
             self._update_insert_pos(context, event)
             # set new node radius as the first selected node
             if event.value == "PRESS":
-                context.window_manager.fast_sketch.is_inserting = True
-                if context.object is not None and context.object.fast_sketch_properties.is_fast_sketch:
-                    active_index = context.object.fast_sketch_properties.active_index
+                context.window_manager.fast_sketch.is_inserting = event.alt
+                context.window_manager.fast_sketch.is_branch = event.shift
+                if event.alt and context.object is not None and context.object.fast_sketch_properties.is_fast_sketch:
+                    tube_index = context.object.fast_sketch_properties.active_index
                     tubes = context.object.fast_sketch_properties.tubes
-                    if active_index >= 0:
-                        tube = tubes[active_index]
+                    if tube_index >= 0:
+                        tube = tubes[tube_index]
                         for node in tube.nodes:
                             if node.active:
                                 context.window_manager.fast_sketch.insert_radius = node.radius
                                 break
             if event.value == "RELEASE":
-                context.window_manager.fast_sketch.is_inserting = False
+                context.window_manager.fast_sketch.is_inserting = event.alt
+                context.window_manager.fast_sketch.is_branch = event.shift
             return {"FINISHED"}
 
         if event.type == "DEL":
             # ============================ delete ============================
             # delete all selected nodes
             if context.object is not None and context.object.fast_sketch_properties.is_fast_sketch:
-                active_index = context.object.fast_sketch_properties.active_index
+                tube_index = context.object.fast_sketch_properties.active_index
                 tubes = context.object.fast_sketch_properties.tubes
-                if active_index >= 0:
-                    tube = tubes[active_index]
+                if tube_index >= 0:
+                    tube = tubes[tube_index]
 
                     has_selected = False
-                    for index in range(len(tube.nodes) - 1, -1, -1):
-                        node = tube.nodes[index]
+                    for node_index in range(len(tube.nodes) - 1, -1, -1):
+                        node = tube.nodes[node_index]
                         if node.active:
                             has_selected = True
                             break
                     if has_selected:
                         bpy.ops.ed.undo_push()
-                        for index in range(len(tube.nodes) - 1, -1, -1):
-                            node = tube.nodes[index]
+                        for node_index in range(len(tube.nodes) - 1, -1, -1):
+                            node = tube.nodes[node_index]
                             if node.active:
-                                tube.nodes.remove(index)
+                                tube.nodes.remove(node_index)
+
+                                # remove branch relationships
+                                if node_index == 0:
+                                    tube.parent_tube_index = -1
+                                    tube.parent_node_index = -1
+                                for related_tube in tubes:
+                                    if related_tube.parent_tube_index == tube_index \
+                                            and related_tube.parent_node_index == node_index:
+                                        related_tube.parent_tube_index = -1
+                                        related_tube.parent_node_index = -1
 
                         update_geometry()
 
@@ -348,10 +384,10 @@ class FastSketchToolOperator(bpy.types.Operator):
             if not self._mouse_moved:
                 # click select
                 if context.object is not None and context.object.fast_sketch_properties.is_fast_sketch:
-                    active_index = context.object.fast_sketch_properties.active_index
+                    tube_index = context.object.fast_sketch_properties.active_index
                     tubes = context.object.fast_sketch_properties.tubes
-                    if active_index >= 0:
-                        tube = tubes[active_index]
+                    if tube_index >= 0:
+                        tube = tubes[tube_index]
                         if event.ctrl:
                             if self._clicked_index >= 0:
                                 tube.nodes[self._clicked_index].active = not tube.nodes[self._clicked_index].active
@@ -369,10 +405,10 @@ class FastSketchToolOperator(bpy.types.Operator):
 
                 # select all nodes inside selection box
                 if context.object is not None and context.object.fast_sketch_properties.is_fast_sketch:
-                    active_index = context.object.fast_sketch_properties.active_index
+                    tube_index = context.object.fast_sketch_properties.active_index
                     tubes = context.object.fast_sketch_properties.tubes
-                    if active_index >= 0:
-                        tube = tubes[active_index]
+                    if tube_index >= 0:
+                        tube = tubes[tube_index]
                         if len(tube.nodes) == len(self._drag_start_state):
                             start = self._select_box_start
                             end = self._select_box_end
@@ -383,9 +419,9 @@ class FastSketchToolOperator(bpy.types.Operator):
                             region = context.region
                             r3d = context.space_data.region_3d
                             obj_mat = context.object.matrix_world
-                            for i in range(0, len(tube.nodes), 1):
-                                node = tube.nodes[i]
-                                node.active = self._drag_start_state[i]["active"] if event.ctrl else False
+                            for node_index in range(0, len(tube.nodes), 1):
+                                node = tube.nodes[node_index]
+                                node.active = self._drag_start_state[node_index]["active"] if event.ctrl else False
                                 p = location_3d_to_region_2d(region, r3d, obj_mat @ node.location)
                                 if p.x >= x0 and p.x <= x1 and p.y >= y0 and p.y <= y1:
                                     node.active = True
@@ -396,10 +432,10 @@ class FastSketchToolOperator(bpy.types.Operator):
             elif self._drag_move:
                 # ============================ drag move ============================
                 if context.object is not None and context.object.fast_sketch_properties.is_fast_sketch:
-                    active_index = context.object.fast_sketch_properties.active_index
+                    tube_index = context.object.fast_sketch_properties.active_index
                     tubes = context.object.fast_sketch_properties.tubes
-                    if active_index >= 0:
-                        tube = tubes[active_index]
+                    if tube_index >= 0:
+                        tube = tubes[tube_index]
 
                         # auto select the unselected dragging node
                         if not self._mouse_moved and self._clicked_index >= 0 \
@@ -421,14 +457,15 @@ class FastSketchToolOperator(bpy.types.Operator):
                             mouse_loc = region_2d_to_location_3d(region, r3d, (x, y), self._drag_start_depth)
                             det = mouse_loc - self._drag_start_loc
 
-                            for i in range(0, len(tube.nodes), 1):
-                                node = tube.nodes[i]
+                            for node_index in range(0, len(tube.nodes), 1):
+                                node = tube.nodes[node_index]
                                 if node.active:
-                                    location = self._drag_start_state[i]["location"]
+                                    location = self._drag_start_state[node_index]["location"]
                                     location = self._drag_start_mat @ location
                                     location = location + det
                                     location = self._drag_start_inv_mat @ location
                                     node.location = location
+                                    update_branch(tube_index, node_index)
 
                             update_geometry()
 
@@ -451,17 +488,25 @@ class FastSketchTool(bpy.types.WorkSpaceTool):
     bl_keymap = (
         ("fast_sketch.tool", {"type": "LEFTMOUSE", "value": "PRESS"}, None),
         ("fast_sketch.tool", {"type": "LEFTMOUSE", "value": "PRESS", "alt": True}, None),
+        ("fast_sketch.tool", {"type": "LEFTMOUSE", "value": "PRESS", "alt": True, "shift": True}, None),
         ("fast_sketch.tool", {"type": "LEFTMOUSE", "value": "PRESS", "ctrl": True}, None),
         ("fast_sketch.tool", {"type": "WHEELUPMOUSE", "value": "PRESS"}, None),
         ("fast_sketch.tool", {"type": "WHEELDOWNMOUSE", "value": "PRESS"}, None),
         ("fast_sketch.tool", {"type": "WHEELUPMOUSE", "value": "PRESS", "alt": True}, None),
         ("fast_sketch.tool", {"type": "WHEELDOWNMOUSE", "value": "PRESS", "alt": True}, None),
+        ("fast_sketch.tool", {"type": "WHEELUPMOUSE", "value": "PRESS", "alt": True, "shift": True}, None),
+        ("fast_sketch.tool", {"type": "WHEELDOWNMOUSE", "value": "PRESS", "alt": True, "shift": True}, None),
         ("fast_sketch.tool", {"type": "MOUSEMOVE", "value": "ANY"}, None),
         ("fast_sketch.tool", {"type": "MOUSEMOVE", "value": "ANY", "alt": True}, None),
+        ("fast_sketch.tool", {"type": "MOUSEMOVE", "value": "ANY", "alt": True, "shift": True}, None),
         ("fast_sketch.tool", {"type": "LEFT_ALT", "value": "PRESS"}, None),
         ("fast_sketch.tool", {"type": "RIGHT_ALT", "value": "PRESS"}, None),
         ("fast_sketch.tool", {"type": "LEFT_ALT", "value": "RELEASE"}, None),
         ("fast_sketch.tool", {"type": "RIGHT_ALT", "value": "RELEASE"}, None),
+        ("fast_sketch.tool", {"type": "LEFT_SHIFT", "value": "PRESS"}, None),
+        ("fast_sketch.tool", {"type": "RIGHT_SHIFT", "value": "PRESS"}, None),
+        ("fast_sketch.tool", {"type": "LEFT_SHIFT", "value": "RELEASE"}, None),
+        ("fast_sketch.tool", {"type": "RIGHT_SHIFT", "value": "RELEASE"}, None),
         ("fast_sketch.tool", {"type": "DEL", "value": "PRESS"}, None),
         ("fast_sketch.tool", {"type": "ESC", "value": "PRESS"}, None),
     )
