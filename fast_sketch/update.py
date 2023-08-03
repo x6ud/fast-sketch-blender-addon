@@ -13,7 +13,7 @@ def remove_link(tree, from_node_name, from_socket_name, to_node_name, to_socket_
             return
 
 
-def update_geometry_nodes():
+def update_geometry():
     obj = bpy.context.object
     if obj is None or not obj.fast_sketch_properties.is_fast_sketch:
         return
@@ -50,46 +50,10 @@ def update_geometry_nodes():
     sphere_node.inputs["Segments"].default_value = max(segments * 2, 3)
     sphere_node.inputs["Rings"].default_value = max(segments, 2)
 
-    # symmetry
-    symmetry = obj.fast_sketch_properties.symmetry
-    match symmetry:
-        case "x" | "y" | "z":
-            remove_link(tree, "Join", "Geometry", "Output", "Geometry")
-
-            output_node = tree.nodes["Output"]
-            output_node.location.x = 1200
-
-            sym_node = tree.nodes.get("Symmetry")
-            if not sym_node:
-                sym_node = tree.nodes.new("GeometryNodeTransform")
-                sym_node.name = "Symmetry"
-                sym_node.select = False
-                sym_node.location.x = 800
-                tree.links.new(tree.nodes["Join"].outputs["Geometry"], sym_node.inputs["Geometry"])
-            sym_node.inputs["Scale"].default_value = \
-                (-1, 1, 1) if symmetry == "x" else \
-                    (1, -1, 1) if symmetry == "y" else \
-                        (1, 1, -1)
-
-            join_2_node = tree.nodes.get("Join2")
-            if not join_2_node:
-                join_2_node = tree.nodes.new("GeometryNodeJoinGeometry")
-                join_2_node.name = "Join2"
-                join_2_node.select = False
-                join_2_node.location.x = 1000
-                tree.links.new(tree.nodes["Join"].outputs["Geometry"], join_2_node.inputs["Geometry"])
-                tree.links.new(sym_node.outputs["Geometry"], join_2_node.inputs["Geometry"])
-                tree.links.new(join_2_node.outputs["Geometry"], output_node.inputs["Geometry"])
-        case _:
-            output_node = tree.nodes["Output"]
-            output_node.location.x = 800
-            sym_node = tree.nodes.get("Symmetry")
-            if sym_node:
-                tree.nodes.remove(sym_node)
-            join_2_node = tree.nodes.get("Join2")
-            if join_2_node:
-                tree.nodes.remove(join_2_node)
-            tree.links.new(tree.nodes["Join"].outputs["Geometry"], output_node.inputs["Geometry"])
+    # output
+    output_node = tree.nodes["Output"]
+    output_node.location.x = 800
+    tree.links.new(tree.nodes["Join"].outputs["Geometry"], output_node.inputs["Geometry"])
 
     # remove useless nodes
     tubes = obj.fast_sketch_properties.tubes
@@ -179,20 +143,18 @@ def update_geometry_nodes():
             count += 1
 
 
-def replace_join_nodes_with_boolean_nodes():
+def update_mirror():
     obj = bpy.context.object
-    geo_nodes = obj.modifiers.get("Fast Sketch Mesh")
-    tree = geo_nodes.node_group
-    for join_node in tree.nodes:
-        if re.match(r'Tube_([0-9]+)', join_node.name) or join_node.name == "Join" or join_node.name == "Join2":
-            bool_node = tree.nodes.new(type="GeometryNodeMeshBoolean")
-            bool_node.location.x = join_node.location.x
-            bool_node.location.y = join_node.location.y
-            bool_node.select = False
-            bool_node.operation = "UNION"
-            bool_node.inputs[2].default_value = True
-            for link in join_node.inputs[0].links:
-                tree.links.new(link.from_socket, bool_node.inputs["Mesh 2"])
-            for link in join_node.outputs[0].links:
-                tree.links.new(bool_node.outputs["Mesh"], link.to_socket)
-            tree.nodes.remove(join_node)
+    if obj is None or not obj.fast_sketch_properties.is_fast_sketch:
+        return
+
+    mirror = obj.modifiers.get("Fast Sketch Mirror")
+    if not mirror:
+        mirror = obj.modifiers.new("Fast Sketch Mirror", "MIRROR")
+
+    mirror.use_axis[0] = obj.fast_sketch_properties.mirror_axis[0]
+    mirror.use_axis[1] = obj.fast_sketch_properties.mirror_axis[1]
+    mirror.use_axis[2] = obj.fast_sketch_properties.mirror_axis[2]
+    mirror.use_bisect_axis[0] = obj.fast_sketch_properties.bisect_axis[0]
+    mirror.use_bisect_axis[1] = obj.fast_sketch_properties.bisect_axis[1]
+    mirror.use_bisect_axis[2] = obj.fast_sketch_properties.bisect_axis[2]

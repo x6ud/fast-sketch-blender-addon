@@ -1,9 +1,11 @@
 import bpy
-from .update import update_geometry_nodes
+
+from .update import update_geometry, update_mirror
 
 
 def property_update_callback(self, context):
-    update_geometry_nodes()
+    update_geometry()
+    update_mirror()
 
 
 class FastSketchNodeProperties(bpy.types.PropertyGroup):
@@ -26,14 +28,8 @@ class FastSketchGroupProperties(bpy.types.PropertyGroup):
                                     max=12,
                                     name="Segments",
                                     update=property_update_callback)
-    symmetry: bpy.props.EnumProperty(items=[("none", "none", "No Symmetry"),
-                                            ("x", "x", "X Axis"),
-                                            ("y", "y", "Y Axis"),
-                                            ("z", "z", "Z Axis"),
-                                            ],
-                                     name="Symmetry",
-                                     default="none",
-                                     update=property_update_callback)
+    mirror_axis: bpy.props.BoolVectorProperty(name="Mirror", update=property_update_callback)
+    bisect_axis: bpy.props.BoolVectorProperty(name="Bisect", update=property_update_callback)
     remesh: bpy.props.BoolProperty(default=False, name="Remesh")
     remesh_voxel_size: bpy.props.FloatProperty(default=0.05, min=0.0001, max=100, name="Voxel Size", unit="LENGTH")
     smooth: bpy.props.BoolProperty(default=False, name="Smooth")

@@ -1,6 +1,6 @@
 import bpy
 
-from .update import update_geometry_nodes, replace_join_nodes_with_boolean_nodes
+from .update import update_geometry
 
 
 class FastSketchTubeList(bpy.types.UIList):
@@ -30,7 +30,16 @@ class FastSketchPanel(bpy.types.Panel):
         fast_sketch = context.object.fast_sketch_properties
 
         layout.prop(fast_sketch, "segments")
-        layout.prop(fast_sketch, "symmetry")
+        row = layout.row(align=True)
+        row.label(text="Mirror")
+        row.prop(fast_sketch, "mirror_axis", index=0, toggle=True, text="X")
+        row.prop(fast_sketch, "mirror_axis", index=1, toggle=True, text="Y")
+        row.prop(fast_sketch, "mirror_axis", index=2, toggle=True, text="Z")
+        row = layout.row(align=True)
+        row.label(text="Bisect")
+        row.prop(fast_sketch, "bisect_axis", index=0, toggle=True, text="X")
+        row.prop(fast_sketch, "bisect_axis", index=1, toggle=True, text="Y")
+        row.prop(fast_sketch, "bisect_axis", index=2, toggle=True, text="Z")
 
         row = layout.row()
         row.template_list("FAST_SKETCH_UL_tube_list", "", fast_sketch, "tubes", fast_sketch, "active_index")
@@ -56,14 +65,37 @@ class FastSketchBakeOperator(bpy.types.Operator):
     def execute(self, context):
         bpy.ops.ed.undo_push()
         context.object.fast_sketch_properties.is_fast_sketch = False
+
+        # apply geometry nodes
         geo_nodes = context.object.modifiers.get("Fast Sketch Mesh")
         if geo_nodes:
-            if not context.object.fast_sketch_properties.remesh:
-                replace_join_nodes_with_boolean_nodes()
             bpy.ops.object.modifier_apply(modifier="Fast Sketch Mesh")
+
+        # apply mirror
+        if context.object.modifiers.get("Fast Sketch Mirror"):
+            bpy.ops.object.modifier_apply(modifier="Fast Sketch Mirror")
+
         if context.object.fast_sketch_properties.remesh:
+            # apply remesh
             context.object.data.remesh_voxel_size = context.object.fast_sketch_properties.remesh_voxel_size
             bpy.ops.object.voxel_remesh()
+        else:
+            # remove internal vertices
+            geo_nodes = context.object.modifiers.new("Fast Sketch Boolean Union", "NODES")
+            tree = bpy.data.node_groups.new("Geometry Nodes", "GeometryNodeTree")
+            geo_nodes.node_group = tree
+            tree.inputs.new("NodeSocketGeometry", "Geometry")
+            tree.outputs.new("NodeSocketGeometry", "Geometry")
+            input_node = tree.nodes.new("NodeGroupInput")
+            output_node = tree.nodes.new("NodeGroupOutput")
+            bool_node = tree.nodes.new(type="GeometryNodeMeshBoolean")
+            bool_node.operation = "UNION"
+            bool_node.inputs[2].default_value = True
+            tree.links.new(input_node.outputs[0], bool_node.inputs["Mesh 2"])
+            tree.links.new(bool_node.outputs[0], output_node.inputs[0])
+            bpy.ops.object.modifier_apply(modifier="Fast Sketch Boolean Union")
+
+        # apply smooth
         if context.object.fast_sketch_properties.smooth:
             bpy.ops.object.modifier_add(type="LAPLACIANSMOOTH")
             bpy.context.object.modifiers["LaplacianSmooth"].iterations = \
@@ -73,6 +105,7 @@ class FastSketchBakeOperator(bpy.types.Operator):
             bpy.context.object.modifiers["LaplacianSmooth"].use_volume_preserve = False
             bpy.context.object.modifiers["LaplacianSmooth"].use_normalized = False
             bpy.ops.object.modifier_apply(modifier="LaplacianSmooth")
+
         return {'FINISHED'}
 
 
@@ -87,7 +120,7 @@ class FastSketchAddTubeOperator(bpy.types.Operator):
         item = tubes.add()
         item.name = "Tube"
         context.object.fast_sketch_properties.active_index = len(tubes) - 1
-        update_geometry_nodes()
+        update_geometry()
 
         # update gizmo
         bpy.context.region.tag_redraw()
@@ -106,7 +139,7 @@ class FastSketchRemoveTubeOperator(bpy.types.Operator):
             bpy.ops.ed.undo_push()
             tubes.remove(index)
             context.object.fast_sketch_properties.active_index = min(index, len(tubes) - 1)
-            update_geometry_nodes()
+            update_geometry()
 
             # update gizmo
             bpy.context.region.tag_redraw()

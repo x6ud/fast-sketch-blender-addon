@@ -6,7 +6,7 @@ import mathutils
 import time
 from pathlib import Path
 from .misc import get_mouse_pointing_node_index
-from .update import update_geometry_nodes
+from .update import update_geometry, update_mirror
 
 RADIUS_STEP = 0.02
 RADIUS_MAX = 10
@@ -102,7 +102,8 @@ class FastSketchToolOperator(bpy.types.Operator):
                 for i in range(len(active_tube.nodes) - 1, insert_index, -1):
                     active_tube.nodes.move(i, i + 1)
 
-                update_geometry_nodes()
+                update_geometry()
+                update_mirror()
 
                 # update gizmo
                 bpy.context.region.tag_redraw()
@@ -198,7 +199,7 @@ class FastSketchToolOperator(bpy.types.Operator):
                                     r = max(r - RADIUS_STEP, RADIUS_MIN)
                                 node.radius = r
 
-                        update_geometry_nodes()
+                        update_geometry()
 
                         # update gizmo
                         context.area.tag_redraw()
@@ -256,7 +257,7 @@ class FastSketchToolOperator(bpy.types.Operator):
                             if node.active:
                                 tube.nodes.remove(index)
 
-                        update_geometry_nodes()
+                        update_geometry()
 
                     # update gizmo
                     context.area.tag_redraw()
@@ -429,7 +430,7 @@ class FastSketchToolOperator(bpy.types.Operator):
                                     location = self._drag_start_inv_mat @ location
                                     node.location = location
 
-                            update_geometry_nodes()
+                            update_geometry()
 
                             # update gizmo
                             context.area.tag_redraw()
