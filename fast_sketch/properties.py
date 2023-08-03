@@ -22,8 +22,8 @@ class FastSketchGroupProperties(bpy.types.PropertyGroup):
     active_index: bpy.props.IntProperty(default=-1)
     tubes: bpy.props.CollectionProperty(type=FastSketchTubeProperties, name="Tubes")
     segments: bpy.props.IntProperty(default=4,
-                                    min=1,
-                                    max=6,
+                                    min=2,
+                                    max=12,
                                     name="Segments",
                                     update=property_update_callback)
     symmetry: bpy.props.EnumProperty(items=[("none", "none", "No Symmetry"),
@@ -34,7 +34,7 @@ class FastSketchGroupProperties(bpy.types.PropertyGroup):
                                      name="Symmetry",
                                      default="none",
                                      update=property_update_callback)
-    remesh: bpy.props.BoolProperty(default=True, name="Remesh")
+    remesh: bpy.props.BoolProperty(default=False, name="Remesh")
     remesh_voxel_size: bpy.props.FloatProperty(default=0.05, min=0.0001, max=100, name="Voxel Size", unit="LENGTH")
     smooth: bpy.props.BoolProperty(default=False, name="Smooth")
     smooth_iterators: bpy.props.IntProperty(default=2, min=1, max=50, name="Smooth Iterators")

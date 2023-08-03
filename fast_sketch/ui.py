@@ -1,5 +1,6 @@
 import bpy
-from .update import update_geometry_nodes
+
+from .update import update_geometry_nodes, replace_join_nodes_with_boolean_nodes
 
 
 class FastSketchTubeList(bpy.types.UIList):
@@ -57,6 +58,8 @@ class FastSketchBakeOperator(bpy.types.Operator):
         context.object.fast_sketch_properties.is_fast_sketch = False
         geo_nodes = context.object.modifiers.get("Fast Sketch Mesh")
         if geo_nodes:
+            if not context.object.fast_sketch_properties.remesh:
+                replace_join_nodes_with_boolean_nodes()
             bpy.ops.object.modifier_apply(modifier="Fast Sketch Mesh")
         if context.object.fast_sketch_properties.remesh:
             context.object.data.remesh_voxel_size = context.object.fast_sketch_properties.remesh_voxel_size

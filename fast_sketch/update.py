@@ -1,5 +1,6 @@
-import bpy
 import re
+
+import bpy
 
 
 def remove_link(tree, from_node_name, from_socket_name, to_node_name, to_socket_name):
@@ -46,8 +47,8 @@ def update_geometry_nodes():
     # segments
     segments = obj.fast_sketch_properties.segments
     sphere_node = tree.nodes["Sphere"]
-    sphere_node.inputs["Segments"].default_value = segments * 8
-    sphere_node.inputs["Rings"].default_value = segments * 4
+    sphere_node.inputs["Segments"].default_value = max(segments * 2, 3)
+    sphere_node.inputs["Rings"].default_value = max(segments, 2)
 
     # symmetry
     symmetry = obj.fast_sketch_properties.symmetry
@@ -176,3 +177,22 @@ def update_geometry_nodes():
                 hull_node.location.y = join_node.location.y
 
             count += 1
+
+
+def replace_join_nodes_with_boolean_nodes():
+    obj = bpy.context.object
+    geo_nodes = obj.modifiers.get("Fast Sketch Mesh")
+    tree = geo_nodes.node_group
+    for join_node in tree.nodes:
+        if re.match(r'Tube_([0-9]+)', join_node.name) or join_node.name == "Join" or join_node.name == "Join2":
+            bool_node = tree.nodes.new(type="GeometryNodeMeshBoolean")
+            bool_node.location.x = join_node.location.x
+            bool_node.location.y = join_node.location.y
+            bool_node.select = False
+            bool_node.operation = "UNION"
+            bool_node.inputs[2].default_value = True
+            for link in join_node.inputs[0].links:
+                tree.links.new(link.from_socket, bool_node.inputs["Mesh 2"])
+            for link in join_node.outputs[0].links:
+                tree.links.new(bool_node.outputs["Mesh"], link.to_socket)
+            tree.nodes.remove(join_node)
