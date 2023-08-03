@@ -5,6 +5,10 @@ Zpheres in ZBrush and [Dust3D](https://github.com/huxingyi/dust3d).
 
 ![](./screenshot.png)
 
+## Download
+
+[v1.0.0](https://github.com/x6ud/fast-sketch-blender-addon/releases/download/v1.0.0/fast_sketch_1_0_0.zip) (for Blender 3.5)
+
 ## Usage
 
 1. Select the Fast Sketch tool.
