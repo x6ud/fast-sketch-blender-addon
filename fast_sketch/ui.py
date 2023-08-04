@@ -27,9 +27,8 @@ class FastSketchPanel(bpy.types.Panel):
         return context.object is not None and context.object.fast_sketch_properties.is_fast_sketch
 
     def draw(self, context):
-        layout = self.layout
         fast_sketch = context.object.fast_sketch_properties
-
+        layout = self.layout
         layout.prop(fast_sketch, "method")
         if fast_sketch.method == "Geometry Node":
             layout.prop(fast_sketch, "segments")
@@ -49,23 +48,14 @@ class FastSketchPanel(bpy.types.Panel):
         row.prop(fast_sketch, "bisect_axis", index=0, toggle=True, text="X")
         row.prop(fast_sketch, "bisect_axis", index=1, toggle=True, text="Y")
         row.prop(fast_sketch, "bisect_axis", index=2, toggle=True, text="Z")
-
         row = layout.row()
         row.template_list("FAST_SKETCH_UL_tube_list", "", fast_sketch, "tubes", fast_sketch, "active_index")
-
         col = row.column(align=True)
         col.operator("fast_sketch.add_tube", icon="ADD", text="")
         col.operator("fast_sketch.remove_tube", icon="REMOVE", text="")
-
         layout.separator()
-
-        layout.prop(fast_sketch, "merge_meshes")
-        layout.prop(fast_sketch, "remesh")
-        layout.prop(fast_sketch, "remesh_voxel_size")
-        layout.prop(fast_sketch, "smooth")
-        layout.prop(fast_sketch, "smooth_iterators")
-        layout.prop(fast_sketch, "smooth_factor")
         layout.operator("fast_sketch.create_armature", text="Create Armature", icon="OUTLINER_OB_ARMATURE")
+        layout.prop(fast_sketch, "merge_meshes")
         layout.operator("fast_sketch.bake", text="Bake!", icon="CHECKMARK")
 
 
@@ -79,11 +69,10 @@ class FastSketchBakeOperator(bpy.types.Operator):
         obj = context.object
         obj.fast_sketch_properties.is_fast_sketch = False
 
-        merge_meshes = obj.fast_sketch_properties.merge_meshes and not obj.fast_sketch_properties.remesh
+        merge_meshes = obj.fast_sketch_properties.merge_meshes
 
         if obj.modifiers.get("Fast Sketch Mesh"):
-            if not obj.fast_sketch_properties.remesh:
-                replace_join_nodes_with_boolean_nodes(merge_meshes)
+            replace_join_nodes_with_boolean_nodes(merge_meshes)
             bpy.ops.object.modifier_apply(modifier="Fast Sketch Mesh")
 
         if obj.modifiers.get("Fast Sketch Skin"):
@@ -111,20 +100,6 @@ class FastSketchBakeOperator(bpy.types.Operator):
 
         if obj.modifiers.get("Fast Sketch Mirror"):
             bpy.ops.object.modifier_apply(modifier="Fast Sketch Mirror")
-
-        if obj.fast_sketch_properties.remesh:
-            obj.data.remesh_voxel_size = obj.fast_sketch_properties.remesh_voxel_size
-            bpy.ops.object.voxel_remesh()
-
-        if obj.fast_sketch_properties.smooth:
-            bpy.ops.object.modifier_add(type="LAPLACIANSMOOTH")
-            obj.modifiers["LaplacianSmooth"].iterations = \
-                obj.fast_sketch_properties.smooth_iterators
-            obj.modifiers["LaplacianSmooth"].lambda_factor = \
-                obj.fast_sketch_properties.smooth_factor
-            obj.modifiers["LaplacianSmooth"].use_volume_preserve = False
-            obj.modifiers["LaplacianSmooth"].use_normalized = False
-            bpy.ops.object.modifier_apply(modifier="LaplacianSmooth")
 
         return {'FINISHED'}
 

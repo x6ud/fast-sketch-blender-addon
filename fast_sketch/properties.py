@@ -49,17 +49,13 @@ class FastSketchGroupProperties(bpy.types.PropertyGroup):
                                                     update=property_update_callback)
     bisect_axis: bpy.props.BoolVectorProperty(name="Bisect", update=property_update_callback)
     merge_meshes: bpy.props.BoolProperty(default=True, name="Merge Meshes")
-    remesh: bpy.props.BoolProperty(default=False, name="Remesh")
-    remesh_voxel_size: bpy.props.FloatProperty(default=0.05, min=0.0001, max=100, name="Voxel Size", unit="LENGTH")
-    smooth: bpy.props.BoolProperty(default=False, name="Smooth")
-    smooth_iterators: bpy.props.IntProperty(default=2, min=1, max=50, name="Smooth Iterators")
-    smooth_factor: bpy.props.FloatProperty(default=0.1, min=0.01, max=10, name="Smooth Factor")
 
 
 # global temporary properties
 class FastSketchWmProperties(bpy.types.PropertyGroup):
     is_inserting: bpy.props.BoolProperty()
     insert_loc: bpy.props.FloatVectorProperty()
-    insert_index: bpy.props.IntProperty(default=-1)
+    insert_tube_index: bpy.props.IntProperty(default=-1)
+    insert_node_index: bpy.props.IntProperty(default=-1)
     insert_radius: bpy.props.FloatProperty(default=.5)
     is_branch: bpy.props.BoolProperty()

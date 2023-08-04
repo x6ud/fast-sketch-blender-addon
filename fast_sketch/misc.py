@@ -6,16 +6,15 @@ from bpy_extras.view3d_utils import region_2d_to_location_3d
 from mathutils import Vector
 
 
-def get_mouse_pointing_node_index(context, location):
-    tube = None
-    tube_index = -1
-    pointing_index = -1
-    if context.object is not None and context.object.fast_sketch_properties.is_fast_sketch:
+def get_mouse_pointing_node(context, location):
+    pointing_tube_index = -1
+    pointing_node_index = -1
+    if context.object and context.object.fast_sketch_properties.is_fast_sketch:
         active_index = context.object.fast_sketch_properties.active_index
         tubes = context.object.fast_sketch_properties.tubes
-        if active_index >= 0:
-            tube = tubes[active_index]
-            tube_index = active_index
+        for tube_index, tube in enumerate(tubes):
+            if 0 <= active_index != tube_index:
+                continue
             obj_mat = context.object.matrix_world
             obj_scale = obj_mat.to_scale()
             scale = min(obj_scale.x, obj_scale.y, obj_scale.z)
@@ -31,10 +30,12 @@ def get_mouse_pointing_node_index(context, location):
                     prj = perspective_matrix @ Vector((mouse_loc.x, mouse_loc.y, mouse_loc.z, 1.0))
                     if (active and node.active or not active) and prj.z < min_z:
                         min_z = prj.z
-                        pointing_index = index
+                        pointing_tube_index = tube_index
+                        pointing_node_index = index
                         if node.active:
                             active = True
-    return tube, tube_index, pointing_index
+
+    return pointing_tube_index, pointing_node_index
 
 
 def update_branch(target_tube_index, target_node_index):

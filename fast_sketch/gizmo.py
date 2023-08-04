@@ -3,14 +3,15 @@ import math
 import bpy
 import mathutils
 
-from .misc import get_mouse_pointing_node_index
+from .misc import get_mouse_pointing_node
 
 
 class FastSketchGizmo(bpy.types.Gizmo):
     bl_idname = "fast_sketch.gizmo"
     bl_label = "Fast Sketch Gizmo"
 
-    _select_index = -1
+    _select_tube_index = -1
+    _select_node_index = -1
     _circle_shape = None
     _line_shape = None
 
@@ -66,11 +67,12 @@ class FastSketchGizmo(bpy.types.Gizmo):
             self._line_shape = self.new_custom_shape("LINE_STRIP", ((0, 0, 0), (1, 0, 0)))
 
     def test_select(self, context, location):
-        old_index = self._select_index
-        _, _, self._select_index = get_mouse_pointing_node_index(context, location)
+        old_tube_index = self._select_tube_index
+        old_node_index = self._select_node_index
+        self._select_tube_index, self._select_node_index = get_mouse_pointing_node(context, location)
 
         # force redraw
-        if old_index != self._select_index:
+        if old_tube_index != self._select_tube_index or old_node_index != self._select_node_index:
             context.region.tag_redraw()
 
         # don't use blender's default gizmo highlighting here so always return -1
@@ -78,12 +80,13 @@ class FastSketchGizmo(bpy.types.Gizmo):
 
     def draw(self, context):
         is_inserting = context.window_manager.fast_sketch.is_inserting
-        insert_index = context.window_manager.fast_sketch.insert_index
+        insert_tube_index = context.window_manager.fast_sketch.insert_tube_index
+        insert_node_index = context.window_manager.fast_sketch.insert_node_index
         insert_loc = mathutils.Vector(context.window_manager.fast_sketch.insert_loc)
         insert_radius = context.window_manager.fast_sketch.insert_radius
         is_branch = context.window_manager.fast_sketch.is_branch
 
-        if is_inserting and insert_index == -1:
+        if is_inserting and insert_node_index == -1:
             self.alpha = 1
             self.color = (1, 0, 1)
             self._draw_circle(context, insert_loc, insert_radius)
@@ -91,23 +94,28 @@ class FastSketchGizmo(bpy.types.Gizmo):
         if context.object is not None and context.object.fast_sketch_properties.is_fast_sketch:
             active_index = context.object.fast_sketch_properties.active_index
             tubes = context.object.fast_sketch_properties.tubes
-            if active_index >= 0:
-                tube = tubes[active_index]
+
+            for tube_index, tube in enumerate(tubes):
+                if 0 <= active_index != tube_index:
+                    continue
+
                 obj_mat = context.object.matrix_world
                 obj_scale = obj_mat.to_scale()
                 scale = min(obj_scale.x, obj_scale.y, obj_scale.z)
                 self._begin_line()
-                for index, node in enumerate(tube.nodes):
+                for node_index, node in enumerate(tube.nodes):
                     loc = obj_mat @ node.location
 
                     # draw circle
                     self.alpha = 1
                     self.color = (1, 1, 1)
-                    if index == 0:
+                    if node_index == 0:
                         self.color = (.75, .75, 1)
-                    if index == self._select_index and not is_inserting:
+                    if tube_index == self._select_tube_index \
+                            and node_index == self._select_node_index \
+                            and not is_inserting:
                         self.color = (1, 0, 1)
-                    if node.active:
+                    if node.active and (tube_index == active_index or active_index < 0):
                         self.color = (1, 1, 0)
                     self._draw_circle(context, loc, scale * node.radius)
 
@@ -117,7 +125,9 @@ class FastSketchGizmo(bpy.types.Gizmo):
                     self._line_to(loc)
 
                     # insert
-                    if is_inserting and insert_index == index:
+                    if is_inserting \
+                            and insert_tube_index == tube_index \
+                            and insert_node_index == node_index:
                         self.alpha = 1
                         self.color = (1, 0, 1)
                         self._draw_circle(context, insert_loc, insert_radius)
