@@ -50,7 +50,7 @@ class FastSketchToolOperator(bpy.types.Operator):
                 active_node = None
                 insert_node_index = -1
 
-                if context.object is not None and context.object.fast_sketch_properties.is_fast_sketch:
+                if context.object and context.object.fast_sketch_properties.is_fast_sketch:
                     active_obj = context.object
 
                 if active_obj:
@@ -174,7 +174,7 @@ class FastSketchToolOperator(bpy.types.Operator):
                 # save drag start state
                 self._drag_move = pointing_node_index >= 0
                 self._drag_start_state = []
-                if context.object.fast_sketch_properties.is_fast_sketch:
+                if context.object and context.object.fast_sketch_properties.is_fast_sketch:
                     tubes = context.object.fast_sketch_properties.tubes
                     for tube_index, tube in enumerate(tubes):
                         tube_state = []
@@ -298,7 +298,7 @@ class FastSketchToolOperator(bpy.types.Operator):
         if event.type == "DEL":
             # ============================ delete ============================
             # delete all selected nodes
-            if context.object is not None and context.object.fast_sketch_properties.is_fast_sketch:
+            if context.object and context.object.fast_sketch_properties.is_fast_sketch:
                 active_index = context.object.fast_sketch_properties.active_index
                 tubes = context.object.fast_sketch_properties.tubes
                 has_selected = False
@@ -324,10 +324,12 @@ class FastSketchToolOperator(bpy.types.Operator):
                                     tube.parent_tube_index = -1
                                     tube.parent_node_index = -1
                                 for related_tube in tubes:
-                                    if related_tube.parent_tube_index == tube_index \
-                                            and related_tube.parent_node_index == node_index:
-                                        related_tube.parent_tube_index = -1
-                                        related_tube.parent_node_index = -1
+                                    if related_tube.parent_tube_index == tube_index:
+                                        if related_tube.parent_node_index == node_index:
+                                            related_tube.parent_tube_index = -1
+                                            related_tube.parent_node_index = -1
+                                        elif related_tube.parent_node_index > node_index:
+                                            related_tube.parent_node_index -= 1
 
                     update_geometry()
 
@@ -335,7 +337,7 @@ class FastSketchToolOperator(bpy.types.Operator):
                     context.area.tag_redraw()
 
         if event.type == "ESC":
-            if context.object is not None and context.object.fast_sketch_properties.is_fast_sketch:
+            if context.object and context.object.fast_sketch_properties.is_fast_sketch:
                 if context.object.fast_sketch_properties.active_index >= 0:
                     context.object.fast_sketch_properties.active_index = -1
                 else:
@@ -377,7 +379,7 @@ class FastSketchToolOperator(bpy.types.Operator):
         context.window_manager.fast_sketch.insert_tube_index = -1
         context.window_manager.fast_sketch.insert_node_index = -1
 
-        if context.object is not None and context.object.fast_sketch_properties.is_fast_sketch:
+        if context.object and context.object.fast_sketch_properties.is_fast_sketch:
             active_obj = context.object
 
         if active_obj:
@@ -518,7 +520,7 @@ class FastSketchToolOperator(bpy.types.Operator):
 
             elif self._drag_move:
                 # ============================ drag move ============================
-                if context.object is not None and context.object.fast_sketch_properties.is_fast_sketch:
+                if context.object and context.object.fast_sketch_properties.is_fast_sketch:
                     active_index = context.object.fast_sketch_properties.active_index
                     tubes = context.object.fast_sketch_properties.tubes
 
