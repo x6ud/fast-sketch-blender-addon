@@ -30,7 +30,11 @@ class FastSketchPanel(bpy.types.Panel):
         layout = self.layout
         fast_sketch = context.object.fast_sketch_properties
 
-        layout.prop(fast_sketch, "segments")
+        layout.prop(fast_sketch, "method")
+        if fast_sketch.method == "Geometry Node":
+            layout.prop(fast_sketch, "segments")
+        if fast_sketch.method == "Skin Modifier":
+            layout.prop(fast_sketch, "sub_surf_levels")
         row = layout.row(align=True)
         row.label(text="Mirror")
         row.prop(fast_sketch, "mirror_axis", index=0, toggle=True, text="X")
@@ -55,6 +59,7 @@ class FastSketchPanel(bpy.types.Panel):
 
         layout.separator()
 
+        layout.prop(fast_sketch, "merge_meshes")
         layout.prop(fast_sketch, "remesh")
         layout.prop(fast_sketch, "remesh_voxel_size")
         layout.prop(fast_sketch, "smooth")
@@ -70,26 +75,27 @@ class FastSketchBakeOperator(bpy.types.Operator):
 
     def execute(self, context):
         bpy.ops.ed.undo_push()
-        context.object.fast_sketch_properties.is_fast_sketch = False
 
-        # apply geometry nodes
-        geo_nodes = context.object.modifiers.get("Fast Sketch Mesh")
-        if geo_nodes:
-            if not context.object.fast_sketch_properties.remesh:
-                replace_join_nodes_with_boolean_nodes()
+        obj = context.object
+        obj.fast_sketch_properties.is_fast_sketch = False
+
+        merge_meshes = obj.fast_sketch_properties.merge_meshes and not obj.fast_sketch_properties.remesh
+
+        if obj.modifiers.get("Fast Sketch Mesh"):
+            if not obj.fast_sketch_properties.remesh:
+                replace_join_nodes_with_boolean_nodes(merge_meshes)
             bpy.ops.object.modifier_apply(modifier="Fast Sketch Mesh")
 
-        # apply mirror
-        if context.object.modifiers.get("Fast Sketch Mirror"):
-            bpy.ops.object.modifier_apply(modifier="Fast Sketch Mirror")
+        if obj.modifiers.get("Fast Sketch Skin"):
+            bpy.ops.object.modifier_apply(modifier="Fast Sketch Skin")
 
-        if context.object.fast_sketch_properties.remesh:
-            # apply remesh
-            context.object.data.remesh_voxel_size = context.object.fast_sketch_properties.remesh_voxel_size
-            bpy.ops.object.voxel_remesh()
-        else:
+        if obj.modifiers.get("Fast Sketch Sub Surf"):
+            bpy.ops.object.modifier_apply(modifier="Fast Sketch Sub Surf")
+
+        if merge_meshes and obj.fast_sketch_properties.method == "Skin Modifier":
             # remove internal vertices
-            geo_nodes = context.object.modifiers.new("Fast Sketch Boolean Union", "NODES")
+            geo_nodes = obj.modifiers.new("Fast Sketch Boolean Union", "NODES")
+            obj.modifiers.move(len(obj.modifiers) - 1, 0)
             tree = bpy.data.node_groups.new("Geometry Nodes", "GeometryNodeTree")
             geo_nodes.node_group = tree
             tree.inputs.new("NodeSocketGeometry", "Geometry")
@@ -103,15 +109,21 @@ class FastSketchBakeOperator(bpy.types.Operator):
             tree.links.new(bool_node.outputs[0], output_node.inputs[0])
             bpy.ops.object.modifier_apply(modifier="Fast Sketch Boolean Union")
 
-        # apply smooth
-        if context.object.fast_sketch_properties.smooth:
+        if obj.modifiers.get("Fast Sketch Mirror"):
+            bpy.ops.object.modifier_apply(modifier="Fast Sketch Mirror")
+
+        if obj.fast_sketch_properties.remesh:
+            obj.data.remesh_voxel_size = obj.fast_sketch_properties.remesh_voxel_size
+            bpy.ops.object.voxel_remesh()
+
+        if obj.fast_sketch_properties.smooth:
             bpy.ops.object.modifier_add(type="LAPLACIANSMOOTH")
-            bpy.context.object.modifiers["LaplacianSmooth"].iterations = \
-                context.object.fast_sketch_properties.smooth_iterators
-            bpy.context.object.modifiers["LaplacianSmooth"].lambda_factor = \
-                context.object.fast_sketch_properties.smooth_factor
-            bpy.context.object.modifiers["LaplacianSmooth"].use_volume_preserve = False
-            bpy.context.object.modifiers["LaplacianSmooth"].use_normalized = False
+            obj.modifiers["LaplacianSmooth"].iterations = \
+                obj.fast_sketch_properties.smooth_iterators
+            obj.modifiers["LaplacianSmooth"].lambda_factor = \
+                obj.fast_sketch_properties.smooth_factor
+            obj.modifiers["LaplacianSmooth"].use_volume_preserve = False
+            obj.modifiers["LaplacianSmooth"].use_normalized = False
             bpy.ops.object.modifier_apply(modifier="LaplacianSmooth")
 
         return {'FINISHED'}

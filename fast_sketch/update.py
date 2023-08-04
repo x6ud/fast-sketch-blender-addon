@@ -1,6 +1,30 @@
 import re
 
+import bmesh
 import bpy
+
+
+def update_geometry():
+    obj = bpy.context.object
+    if obj is None or not obj.fast_sketch_properties.is_fast_sketch:
+        return
+    method = obj.fast_sketch_properties.method
+    if method == "Geometry Node":
+        skin = obj.modifiers.get("Fast Sketch Skin")
+        if skin:
+            obj.modifiers.remove(skin)
+        sub_surf = obj.modifiers.get("Fast Sketch Sub Surf")
+        if sub_surf:
+            obj.modifiers.remove(sub_surf)
+        build_geometry_node()
+    elif method == "Skin Modifier":
+        geo_nodes = obj.modifiers.get("Fast Sketch Mesh")
+        if geo_nodes:
+            node_group = geo_nodes.node_group
+            if node_group:
+                bpy.data.node_groups.remove(node_group)
+            obj.modifiers.remove(geo_nodes)
+        build_skin_modifier()
 
 
 def remove_link(tree, from_node_name, from_socket_name, to_node_name, to_socket_name):
@@ -13,10 +37,8 @@ def remove_link(tree, from_node_name, from_socket_name, to_node_name, to_socket_
             return
 
 
-def update_geometry():
+def build_geometry_node():
     obj = bpy.context.object
-    if obj is None or not obj.fast_sketch_properties.is_fast_sketch:
-        return
 
     # create base nodes
     geo_nodes = obj.modifiers.get("Fast Sketch Mesh")
@@ -41,6 +63,8 @@ def update_geometry():
         join_node.name = "Join"
         join_node.select = False
         join_node.location.x = 600
+
+        obj.modifiers.move(len(obj.modifiers) - 1, 0)
 
     tree = geo_nodes.node_group
 
@@ -143,6 +167,59 @@ def update_geometry():
                 hull_node.location.y = join_node.location.y
 
             count += 1
+
+
+def build_skin_modifier():
+    obj = bpy.context.object
+
+    skin = obj.modifiers.get("Fast Sketch Skin")
+    if not skin:
+        skin = obj.modifiers.new("Fast Sketch Skin", "SKIN")
+        obj.modifiers.move(len(obj.modifiers) - 1, 0)
+
+    sub_surf = obj.modifiers.get("Fast Sketch Sub Surf")
+    if not sub_surf:
+        sub_surf = obj.modifiers.new("Fast Sketch Sub Surf", "SUBSURF")
+        sub_surf.show_only_control_edges = False
+        obj.modifiers.move(len(obj.modifiers) - 1, 1)
+    sub_surf.levels = obj.fast_sketch_properties.sub_surf_levels
+
+    bm = bmesh.new()
+
+    tubes = obj.fast_sketch_properties.tubes
+    tube_vert_index_map = []
+    vertex_count = 0
+    for tube in tubes:
+        node_vert_index_map = []
+        tube_vert_index_map.append(node_vert_index_map)
+        for node_index, node in enumerate(tube.nodes):
+            if node_index == 0 and tube.parent_tube_index >= 0:
+                node_vert_index_map.append(tube_vert_index_map[tube.parent_tube_index][tube.parent_node_index])
+            else:
+                node_vert_index_map.append(vertex_count)
+                vertex_count += 1
+                bm.verts.new((node.location.x, node.location.y, node.location.z))
+    bm.verts.ensure_lookup_table()
+    for tube_index, tube in enumerate(tubes):
+        for node_index in range(1, len(tube.nodes)):
+            i = tube_vert_index_map[tube_index][node_index - 1]
+            j = tube_vert_index_map[tube_index][node_index]
+            bm.edges.new((bm.verts[i], bm.verts[j]))
+
+    bm.to_mesh(obj.data)
+
+    if not len(obj.data.skin_vertices):
+        bpy.ops.mesh.customdata_skin_add()
+
+    skin_verts = obj.data.skin_vertices[0].data
+    for tube_index, tube in enumerate(tubes):
+        for node_index, node in enumerate(tube.nodes):
+            if node_index == 0 and tube.parent_tube_index >= 0:
+                continue
+            vert_index = tube_vert_index_map[tube_index][node_index]
+            skin_vert = skin_verts[vert_index]
+            skin_vert.radius[0] = skin_vert.radius[1] = node.radius
+            skin_vert.use_root = node_index == 0
 
 
 def update_mirror():

@@ -65,12 +65,14 @@ def update_branch(target_tube_index, target_node_index):
     update(target_tube_index, target_node_index)
 
 
-def replace_join_nodes_with_boolean_nodes():
+def replace_join_nodes_with_boolean_nodes(merge_meshes):
     obj = bpy.context.object
     geo_nodes = obj.modifiers.get("Fast Sketch Mesh")
     tree = geo_nodes.node_group
     for join_node in tree.nodes:
-        if re.match(r'Tube_([0-9]+)', join_node.name) or join_node.name == "Join" or join_node.name == "Join2":
+
+        if merge_meshes and join_node.name == "Join" \
+                or re.match(r'Tube_([0-9]+)', join_node.name):
             bool_node = tree.nodes.new(type="GeometryNodeMeshBoolean")
             bool_node.location.x = join_node.location.x
             bool_node.location.y = join_node.location.y
