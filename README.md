@@ -9,6 +9,7 @@ Zpheres in ZBrush and [Dust3D](https://github.com/huxingyi/dust3d). It can also 
 
 [v1.1.0](https://github.com/x6ud/fast-sketch-blender-addon/releases/download/v1.1.0/fast_sketch_1_1_0.zip) (for Blender
 3.5)
+
 [v1.2.0](https://github.com/x6ud/fast-sketch-blender-addon/releases/download/v1.2.0/fast_sketch_1_2_0.zip) (for Blender
 4.3)
 
