@@ -402,7 +402,9 @@ class FastSketchToolOperator(bpy.types.Operator):
                 tubes = active_obj.fast_sketch_properties.tubes
                 active_tube = tubes[active_obj.fast_sketch_properties.active_index]
                 context.window_manager.fast_sketch.insert_node_index = len(active_tube.nodes) - 1
-                active_node = active_tube.nodes[len(active_tube.nodes) - 1]
+                tube_len = len(active_tube.nodes)
+                if tube_len > 0:
+                    active_node = active_tube.nodes[tube_len - 1]
 
         # get mouse clicked location
         depth_loc = (0, 0, 0)

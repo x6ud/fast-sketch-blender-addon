@@ -87,8 +87,10 @@ class FastSketchBakeOperator(bpy.types.Operator):
             obj.modifiers.move(len(obj.modifiers) - 1, 0)
             tree = bpy.data.node_groups.new("Geometry Nodes", "GeometryNodeTree")
             geo_nodes.node_group = tree
-            tree.inputs.new("NodeSocketGeometry", "Geometry")
-            tree.outputs.new("NodeSocketGeometry", "Geometry")
+            # tree.inputs.new("NodeSocketGeometry", "Geometry")
+            # tree.outputs.new("NodeSocketGeometry", "Geometry")
+            tree.interface.new_socket(name="Geometry", socket_type="NodeSocketGeometry", in_out='INPUT')
+            tree.interface.new_socket(name="Geometry", socket_type="NodeSocketGeometry", in_out='OUTPUT')
             input_node = tree.nodes.new("NodeGroupInput")
             output_node = tree.nodes.new("NodeGroupOutput")
             bool_node = tree.nodes.new(type="GeometryNodeMeshBoolean")

@@ -2,8 +2,8 @@ bl_info = {
     "name": "Fast Sketch",
     "description": "",
     "author": "x6ud",
-    "version": (1, 1, 0),
-    "blender": (3, 5, 0),
+    "version": (1, 2, 0),
+    "blender": (4, 3, 0),
     "category": "Object"
 }
 

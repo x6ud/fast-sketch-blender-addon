@@ -46,7 +46,8 @@ def build_geometry_node():
         geo_nodes = obj.modifiers.new("Fast Sketch Mesh", "NODES")
         tree = bpy.data.node_groups.new("Geometry Nodes", "GeometryNodeTree")
         geo_nodes.node_group = tree
-        tree.outputs.new("NodeSocketGeometry", "Geometry")
+        # tree.outputs.new("NodeSocketGeometry", "Geometry")
+        tree.interface.new_socket(name="Geometry", socket_type="NodeSocketGeometry", in_out='OUTPUT')
 
         output_node = tree.nodes.new("NodeGroupOutput")
         output_node.name = "Output"
