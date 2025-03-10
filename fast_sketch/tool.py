@@ -352,7 +352,8 @@ class FastSketchToolOperator(bpy.types.Operator):
     def _draw_callback_px(self, context):
         # ============================ draw selection box ============================
 
-        shader = gpu.shader.from_builtin("2D_UNIFORM_COLOR")
+        # shader = gpu.shader.from_builtin("2D_UNIFORM_COLOR")
+        shader = gpu.shader.from_builtin("UNIFORM_COLOR")
         gpu.state.blend_set("ALPHA")
         gpu.state.line_width_set(2.0)
 

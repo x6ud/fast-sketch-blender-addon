@@ -79,6 +79,7 @@ def replace_join_nodes_with_boolean_nodes(merge_meshes):
             bool_node.location.y = join_node.location.y
             bool_node.select = False
             bool_node.operation = "UNION"
+            bool_node.solver = "EXACT"
             bool_node.inputs[2].default_value = True
             for link in join_node.inputs[0].links:
                 tree.links.new(link.from_socket, bool_node.inputs["Mesh 2"])

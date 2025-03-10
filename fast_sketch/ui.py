@@ -95,6 +95,7 @@ class FastSketchBakeOperator(bpy.types.Operator):
             output_node = tree.nodes.new("NodeGroupOutput")
             bool_node = tree.nodes.new(type="GeometryNodeMeshBoolean")
             bool_node.operation = "UNION"
+            bool_node.solver = "EXACT"
             bool_node.inputs[2].default_value = True
             tree.links.new(input_node.outputs[0], bool_node.inputs["Mesh 2"])
             tree.links.new(bool_node.outputs[0], output_node.inputs[0])
